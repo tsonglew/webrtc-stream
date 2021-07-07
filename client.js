@@ -1,8 +1,21 @@
 var pc = null;
+var localVideo = document.querySelector("video#localVideo");
+var serverVideo = document.querySelector("video#serverVideo");
+
+navigator.mediaDevices.getUserMedia({
+	video: {
+		height: 360,
+		width: 480,
+	}
+
+}).then(stream => {
+	localVideo.srcObject = stream;
+	localVideo.addEventListener('loadedmetadata', () => {
+		localVideo.play();
+	});
+});
 
 function negotiate () {
-	pc.addTransceiver('video', { direction: 'recvonly' });
-	pc.addTransceiver('audio', { direction: 'recvonly' });
 	return pc.createOffer().then(function (offer) {
 		return pc.setLocalDescription(offer);
 	}).then(function () {
@@ -43,21 +56,19 @@ function negotiate () {
 
 function start () {
 	var config = {
-		sdpSemantics: 'unified-plan'
+		sdpSemantics: 'unified-plan',
+		iceServers: [{ urls: ['stun:stun.l..com:19302'] }]
 	};
-
-	if (document.getElementById('use-stun').checked) {
-		config.iceServers = [{ urls: ['stun:stun.l.google.com:19302'] }];
-	}
 
 	pc = new RTCPeerConnection(config);
 
-	// connect audio / video
+	localVideo.srcObject.getVideoTracks().forEach(track => {
+		pc.addTrack(track);
+	});
 	pc.addEventListener('track', function (evt) {
+		console.log("receive server video");
 		if (evt.track.kind == 'video') {
-			document.getElementById('video').srcObject = evt.streams[0];
-		} else {
-			document.getElementById('audio').srcObject = evt.streams[0];
+			serverVideo.srcObject = evt.streams[0];
 		}
 	});
 
@@ -66,10 +77,10 @@ function start () {
 	document.getElementById('stop').style.display = 'inline-block';
 }
 
+
+
 function stop () {
 	document.getElementById('stop').style.display = 'none';
-
-	// close peer connection
 	setTimeout(function () {
 		pc.close();
 	}, 500);
